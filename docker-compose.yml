@@ -1,21 +1,22 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16
     container_name: sakha_postgres
     restart: unless-stopped
+    environment:
+      POSTGRES_USER: sakha
+      POSTGRES_PASSWORD: sakha_dev_password
+      POSTGRES_DB: spiritualsakha
     ports:
       - "5432:5432"
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-spiritualsakha}
-      POSTGRES_USER: ${POSTGRES_USER:-sakha}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sakha_dev_password}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sakha} -d ${POSTGRES_DB:-spiritualsakha}"]
+      test: ["CMD-SHELL", "pg_isready -U sakha -d spiritualsakha"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   redis:
     image: redis:7-alpine
@@ -41,6 +42,13 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      # Override .env values that use 'localhost' — inside Docker, containers
+      # communicate via service names, not localhost.
+      DATABASE_URL: postgresql+asyncpg://sakha:sakha_dev_password@postgres:5432/spiritualsakha
+      REDIS_URL: redis://redis:6379/0
+      MILVUS_HOST: milvus
+      DB_HOST: postgres
     volumes:
       - ./app:/app/app
       - ./panchang.py:/app/panchang.py:ro
@@ -52,8 +60,73 @@ services:
       redis:
         condition: service_healthy
 
+  etcd:
+    container_name: milvus-etcd
+    image: quay.io/coreos/etcd:v3.5.5
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - etcd_data:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  minio:
+    container_name: milvus-minio
+    image: quay.io/minio/minio:latest
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    ports:
+      - "9001:9001"
+      - "9000:9000"
+    volumes:
+      - minio_data:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  milvus:
+    container_name: milvus-standalone
+    image: milvusdb/milvus:v2.4.5
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+    - seccomp:unconfined
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    volumes:
+      - milvus_data:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      start_period: 90s
+      timeout: 20s
+      retries: 3
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    depends_on:
+      - "etcd"
+      - "minio"
+
 volumes:
-  postgres_data:
+  pgdata:
     driver: local
   redis_data:
+    driver: local
+  etcd_data:
+    driver: local
+  minio_data:
+    driver: local
+  milvus_data:
     driver: local

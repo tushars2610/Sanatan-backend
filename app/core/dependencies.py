@@ -36,13 +36,15 @@ async def get_redis():
 async def get_current_user(
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    # Authentication bypassed for now
+    # TODO: Replace with real JWT auth when auth layer is wired up.
+    # For now, falls back to the first user in the DB for any endpoint
+    # that still uses this dependency (e.g. persona, astrology).
     result = await db.execute(select(User).limit(1))
     user = result.scalar_one_or_none()
     if not user:
         user = User(
             phone_number="+919000000000",
-            full_name="Dummy User",
+            full_name="Guest",
             preferred_language="hi",
             timezone="Asia/Kolkata",
         )

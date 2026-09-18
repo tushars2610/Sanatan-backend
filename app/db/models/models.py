@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, date, time
-from sqlalchemy import String, Boolean, Integer, Float, Date, Time, DateTime, ForeignKey, JSON, Text
+from sqlalchemy import String, Boolean, Integer, Float, Date, Time, DateTime, ForeignKey, JSON, Text, ARRAY
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -99,6 +100,7 @@ class Conversation(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    session_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True, default=lambda: str(uuid.uuid4()))
     title: Mapped[str] = mapped_column(String(150), default="Spiritual Dialogue")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -114,6 +116,7 @@ class Message(Base):
     conversation_id: Mapped[str] = mapped_column(String(36), ForeignKey("conversations.id", ondelete="CASCADE"), index=True)
     role: Mapped[str] = mapped_column(String(20))  # "user" or "assistant"
     content: Mapped[Text] = mapped_column(Text)
+    cited_passage_ids: Mapped[list | None] = mapped_column(ARRAY(UUID(as_uuid=False)), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     conversation: Mapped["Conversation"] = relationship("Conversation", back_populates="messages")

@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-1.5-pro"
 
+    # Admin & Deployment
+    ADMIN_SECRET_TOKEN: str = "super_secret_admin_token_123"
+
+    # Milvus (Vector DB)
+    MILVUS_HOST: str = "localhost"
+    MILVUS_PORT: int = 19530
+
     # Astrology & System
     DEFAULT_TIMEZONE: str = "Asia/Kolkata"
     ASTROLOGY_AYANAMSA: str = "LAHIRI"
