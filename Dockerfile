@@ -21,7 +21,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source code and configurations
 COPY app ./app
-COPY panchang.py places.py ./
+COPY panchang.py places.py load_to_postgress.py index_to_milvus.py ./
 COPY migrations ./migrations
 COPY alembic.ini* .env.example ./
 
